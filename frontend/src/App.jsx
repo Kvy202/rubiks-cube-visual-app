@@ -39,7 +39,7 @@ const App = () => {
     };
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/solve", {
+      const res = await fetch("https://rubiks-cube-backend.onrender.com/solve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
