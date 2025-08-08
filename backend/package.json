@@ -1,0 +1,14 @@
+{
+  "name": "rubiks-cube-backend",
+  "version": "1.0.0",
+  "description": "Backend for solving Rubik's Cube states using the Fridrich method",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "rubiks-cube-solver": "^1.2.0"
+  }
+}
