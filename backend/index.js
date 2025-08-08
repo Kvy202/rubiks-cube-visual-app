@@ -6,7 +6,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Use CORS middleware
-app.use(cors());
+app.use(cors({
+  origin: 'https://rubiks-cube-visual-app-ai2v.vercel.app', // your frontend URL
+  methods: ['GET', 'POST'],
+}));
 app.use(express.json());
 
 app.post('/solve', (req, res) => {
