@@ -1,6 +1,8 @@
 // Node.js backend to solve Rubik's cube using the Fridrich method
 const express = require('express');
 const cors = require('cors');
+app.use(cors());
+const cors = require('cors');
 const solver = require('./solver');
 
 /**
