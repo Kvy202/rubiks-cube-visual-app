@@ -57,48 +57,81 @@ const App = () => {
     faces.B.join("");
 
   // ---------- Solve handler ----------
-  const handleSolve = async () => {
-    setResult(null);
+ const handleSolve = async () => {
+  setResult(null);
 
-    // Basic validation
-    if (!facesAreComplete()) {
-      alert(
-        "Please fill all 9 stickers on every face using only W, G, R, B, O, Y."
-      );
-      return;
-    }
-    // Strict (CFOP) validation: exactly 9 of each color
-    if (!haveExactColorCounts()) {
-      alert("Each color must appear exactly 9 times across the cube.");
-      return;
-    }
+  // 1) Basic validation
+  const allowed = new Set(["W","G","R","B","O","Y"]);
+  const faceOk = (arr) => Array.isArray(arr) && arr.length === 9 && arr.every(c => allowed.has(c));
 
-    const cubeState = buildCubeState();
-    const payload = { cubeState, partitioned };
+  const missing = ["U","R","F","D","L","B"].filter(f => !faceOk(faces[f]));
+  if (missing.length) {
+    alert(`Please fill all 9 stickers on these faces with W/G/R/B/O/Y: ${missing.join(", ")}`);
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/solve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  // strict color counts: each color 9 times
+  const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
+  ["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => counts[c]++));
+  if (Object.values(counts).some(n => n !== 9)) {
+    alert("Each color must appear exactly 9 times across the cube.");
+    return;
+  }
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(
-          `Backend error (${res.status}): ${text || "Unknown error"}`
-        );
-      }
-
-      const data = await res.json();
-      setResult(data);
-    } catch (err) {
-      alert(`Error solving cube: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  // 2) Build color->face-letter legend using centers
+  const centers = {
+    U: faces.U[4], R: faces.R[4], F: faces.F[4],
+    D: faces.D[4], L: faces.L[4], B: faces.B[4],
   };
+
+  // Ensure all centers are set
+  if (Object.values(centers).some(c => !allowed.has(c))) {
+    alert("Please set the center sticker (middle) on every face.");
+    return;
+  }
+
+  // invert map: color -> face letter
+  const colorToFace = {};
+  Object.entries(centers).forEach(([faceLetter, color]) => {
+    colorToFace[color] = faceLetter;
+  });
+
+  // 3) Convert every sticker color to face letter, in URFDLB order
+  const order = ["U","R","F","D","L","B"];
+  const faceToLetters = (faceArr) => faceArr.map(c => colorToFace[c]);
+
+  // if any sticker color doesn't match a center color -> invalid
+  if (!order.every(f => faceToLetters(faces[f]).every(ch => ch))) {
+    alert("Sticker colors must match one of the six center colors.");
+    return;
+  }
+
+  const cubeState = order.map(f => faceToLetters(faces[f]).join("")).join("");
+
+  // 4) Send to backend
+  const payload = { cubeState, partitioned };
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/solve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Backend error (${res.status}): ${text}`);
+    }
+
+    const data = await res.json();
+    setResult(data);
+  } catch (err) {
+    alert("Error solving cube: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="max-w-4xl mx-auto p-4">
