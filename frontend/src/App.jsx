@@ -56,13 +56,14 @@ const App = () => {
     faces.L.join("") +
     faces.B.join("");
 
-  // ---------- Solve handler ----------
- const handleSolve = async () => {
+// ---------- Solve handler ----------
+const handleSolve = async () => {
   setResult(null);
 
-  // 1) Basic validation
+  // 1) Basic validation: all 54 filled with allowed colors
   const allowed = new Set(["W","G","R","B","O","Y"]);
-  const faceOk = (arr) => Array.isArray(arr) && arr.length === 9 && arr.every(c => allowed.has(c));
+  const faceOk = (arr) =>
+    Array.isArray(arr) && arr.length === 9 && arr.every(c => allowed.has(c));
 
   const missing = ["U","R","F","D","L","B"].filter(f => !faceOk(faces[f]));
   if (missing.length) {
@@ -70,45 +71,42 @@ const App = () => {
     return;
   }
 
-  // strict color counts: each color 9 times
+  // 2) Strict counts: each color exactly 9 times
   const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
   ["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => counts[c]++));
-  if (Object.values(counts).some(n => n !== 9)) {
+  const wrong = Object.entries(counts).filter(([,n]) => n !== 9);
+  if (wrong.length) {
     alert("Each color must appear exactly 9 times across the cube.");
     return;
   }
 
-  // 2) Build color->face-letter legend using centers
-  const centers = {
-    U: faces.U[4], R: faces.R[4], F: faces.F[4],
-    D: faces.D[4], L: faces.L[4], B: faces.B[4],
-  };
-
-  // Ensure all centers are set
+  // 3) Build color -> face-letter legend from centers
+  const centers = { U: faces.U[4], R: faces.R[4], F: faces.F[4], D: faces.D[4], L: faces.L[4], B: faces.B[4] };
   if (Object.values(centers).some(c => !allowed.has(c))) {
-    alert("Please set the center sticker (middle) on every face.");
+    alert("Please set the center (middle) on every face.");
     return;
   }
-
-  // invert map: color -> face letter
   const colorToFace = {};
-  Object.entries(centers).forEach(([faceLetter, color]) => {
-    colorToFace[color] = faceLetter;
-  });
+  Object.entries(centers).forEach(([faceLetter, color]) => { colorToFace[color] = faceLetter; });
 
-  // 3) Convert every sticker color to face letter, in URFDLB order
+  // 4) Convert every sticker color to face letters, in URFDLB order
   const order = ["U","R","F","D","L","B"];
   const faceToLetters = (faceArr) => faceArr.map(c => colorToFace[c]);
-
-  // if any sticker color doesn't match a center color -> invalid
+  // ensure no color fell outside the 6 centers
   if (!order.every(f => faceToLetters(faces[f]).every(ch => ch))) {
     alert("Sticker colors must match one of the six center colors.");
     return;
   }
-
   const cubeState = order.map(f => faceToLetters(faces[f]).join("")).join("");
 
-  // 4) Send to backend
+  // 5) Debug & final validation before sending
+  console.log("cubeState:", cubeState, "len:", cubeState.length);
+  if (!/^[URFDLB]{54}$/.test(cubeState)) {
+    alert(`cubeState invalid → len=${cubeState.length}, value=${cubeState}`);
+    return;
+  }
+
+  // 6) Send to backend
   const payload = { cubeState, partitioned };
   setLoading(true);
   try {
