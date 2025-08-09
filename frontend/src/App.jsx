@@ -18,7 +18,7 @@ const allowedColors = new Set(["W", "G", "R", "B", "O", "Y"]);
 const App = () => {
   // Initialize each face as 9 empty stickers
   const [faces, setFaces] = useState(
-    facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("") }), {})
+  facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("W") }), {})
   );
   const [currentColor, setCurrentColor] = useState("W");
   const [partitioned, setPartitioned] = useState(true);
