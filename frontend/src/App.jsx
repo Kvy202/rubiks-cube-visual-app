@@ -24,6 +24,10 @@ const App = () => {
   const [partitioned, setPartitioned] = useState(true);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  // in App.jsx, after your useStates:
+React.useEffect(() => {
+  window._faces = faces;      // current stickers
+}, [faces]);
 
   const handleColorChange = (color) => setCurrentColor(color);
 
@@ -99,12 +103,16 @@ const handleSolve = async () => {
   }
   const cubeState = order.map(f => faceToLetters(faces[f]).join("")).join("");
 
-  // 5) Debug & final validation before sending
-  console.log("cubeState:", cubeState, "len:", cubeState.length);
-  if (!/^[URFDLB]{54}$/.test(cubeState)) {
-    alert(`cubeState invalid → len=${cubeState.length}, value=${cubeState}`);
-    return;
-  }
+// 5) Debug & final validation before sending
+const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
+["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => counts[c]++));
+console.log("color counts:", counts);
+
+console.log("cubeState:", cubeState, "len:", cubeState.length);
+if (!/^[URFDLB]{54}$/.test(cubeState)) {
+  alert(`cubeState invalid → len=${cubeState.length}, value=${cubeState}`);
+  return;
+}
 
   // 6) Send to backend
   const payload = { cubeState, partitioned };
