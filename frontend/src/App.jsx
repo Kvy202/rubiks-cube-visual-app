@@ -4,21 +4,28 @@ import ColorPicker from "./ColorPicker";
 import Result from "./Result";
 import Tutorial from "./Tutorial";
 
+/** Backend URL:
+ *  You can set VITE_BACKEND_URL in Vercel/your .env to override.
+ *  Defaults to your Render service.
+ */
+const API_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://rubiks-cube-visual-app.onrender.com";
+
+const facesNames = ["U", "R", "F", "D", "L", "B"];
+const allowedColors = new Set(["W", "G", "R", "B", "O", "Y"]);
+
 const App = () => {
-   const facesNames = ["U", "R", "F", "D", "L", "B"];
-
-   const [faces, setFaces] = useState(
-     facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("") }), {})
-   );
-
+  // Initialize each face as 9 empty stickers
+  const [faces, setFaces] = useState(
+    facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("") }), {})
+  );
   const [currentColor, setCurrentColor] = useState("W");
   const [partitioned, setPartitioned] = useState(true);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleColorChange = (color) => {
-    setCurrentColor(color);
-  };
+  const handleColorChange = (color) => setCurrentColor(color);
 
   const handleSquareClick = (face, index) => {
     const newFace = [...faces[face]];
@@ -26,61 +33,72 @@ const App = () => {
     setFaces((prev) => ({ ...prev, [face]: newFace }));
   };
 
- const handleSolve = async () => {
-  // 1) Validate faces
-  const allowed = new Set(["W","G","R","B","O","Y"]);
-  const faceOk = (arr) => Array.isArray(arr) && arr.length === 9 && arr.every(c => allowed.has(c));
+  // ---------- Validation helpers ----------
+  const facesAreComplete = () =>
+    facesNames.every(
+      (f) =>
+        Array.isArray(faces[f]) &&
+        faces[f].length === 9 &&
+        faces[f].every((c) => allowedColors.has(c))
+    );
 
-  const badFaces = facesNames.filter(f => !faceOk(faces[f]));
-  if (badFaces.length) {
-    alert(`Please fill all 9 stickers on each face with valid colors (W,G,R,B,O,Y).\nMissing/invalid: ${badFaces.join(", ")}`);
-    return;
-  }
-// Optional: strict color counts (9 of each)
-  const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
-  facesNames.forEach(f => faces[f].forEach(c => counts[c]++));
-  const wrong = Object.entries(counts).filter(([,n]) => n !== 9);
-  if (wrong.length) {
-   alert("Each color must appear exactly 9 times. Check your inputs.");
-   return;
-  }
-
-  // 2) Build payload
-  const payload = {
-    faces: {
-      U: faces.U.join(""),
-      R: faces.R.join(""),
-      F: faces.F.join(""),
-      D: faces.D.join(""),
-      L: faces.L.join(""),
-      B: faces.B.join(""),
-    },
-    partitioned,
+  const haveExactColorCounts = () => {
+    const counts = { W: 0, G: 0, R: 0, B: 0, O: 0, Y: 0 };
+    facesNames.forEach((f) => faces[f].forEach((c) => (counts[c] += 1)));
+    return Object.values(counts).every((n) => n === 9);
   };
 
-  setLoading(true);
-  try {
-    const res = await fetch("https://rubiks-cube-visual-app.onrender.com/solve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  const buildCubeState = () =>
+    faces.U.join("") +
+    faces.R.join("") +
+    faces.F.join("") +
+    faces.D.join("") +
+    faces.L.join("") +
+    faces.B.join("");
 
-    // If backend returns 400, surface the reason
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Backend error (${res.status}): ${text}`);
+  // ---------- Solve handler ----------
+  const handleSolve = async () => {
+    setResult(null);
+
+    // Basic validation
+    if (!facesAreComplete()) {
+      alert(
+        "Please fill all 9 stickers on every face using only W, G, R, B, O, Y."
+      );
+      return;
+    }
+    // Strict (CFOP) validation: exactly 9 of each color
+    if (!haveExactColorCounts()) {
+      alert("Each color must appear exactly 9 times across the cube.");
+      return;
     }
 
-    const data = await res.json();
-    setResult(data);
-  } catch (err) {
-    alert("Error solving cube: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+    const cubeState = buildCubeState();
+    const payload = { cubeState, partitioned };
 
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/solve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          `Backend error (${res.status}): ${text || "Unknown error"}`
+        );
+      }
+
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      alert(`Error solving cube: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -100,14 +118,14 @@ const App = () => {
       </div>
 
       <div className="mt-4">
-      <label className="inline-flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={partitioned}
-          onChange={(e) => setPartitioned(e.target.checked)}
-        />
-        <span>Partitioned output (Cross/F2L/OLL/PLL)</span>
-      </label>
+        <label className="inline-flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={partitioned}
+            onChange={(e) => setPartitioned(e.target.checked)}
+          />
+          <span>Partitioned output (Cross/F2L/OLL/PLL)</span>
+        </label>
       </div>
 
       <button
@@ -119,7 +137,6 @@ const App = () => {
       </button>
 
       <Result result={result} />
-
       <Tutorial />
     </div>
   );
