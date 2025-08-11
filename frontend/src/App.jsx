@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import CubeFace from "./CubeFace";
 import ColorPicker from "./ColorPicker";
 import Result from "./Result";
 import Tutorial from "./Tutorial";
 
 /** Backend URL:
- *  You can set VITE_BACKEND_URL in Vercel/your .env to override.
+ *  Set VITE_BACKEND_URL in Vercel/Env to override.
  *  Defaults to your Render service.
  */
 const API_URL =
@@ -16,128 +16,131 @@ const facesNames = ["U", "R", "F", "D", "L", "B"];
 const allowedColors = new Set(["W", "G", "R", "B", "O", "Y"]);
 
 const App = () => {
-  // Initialize each face as 9 empty stickers
+  // Start with all stickers = white (so blank-looking squares are real 'W')
   const [faces, setFaces] = useState(
-  facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("W") }), {})
+    facesNames.reduce((acc, f) => ({ ...acc, [f]: Array(9).fill("W") }), {})
   );
+
   const [currentColor, setCurrentColor] = useState("W");
   const [partitioned, setPartitioned] = useState(true);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  // in App.jsx, after your useStates:
-React.useEffect(() => {
-  window._faces = faces;      // current stickers
-}, [faces]);
+
+  // Expose for quick DevTools inspection (optional)
+  useEffect(() => {
+    window._faces = faces;
+  }, [faces]);
 
   const handleColorChange = (color) => setCurrentColor(color);
 
   const handleSquareClick = (face, index) => {
     const newFace = [...faces[face]];
-    newFace[index] = currentColor;
+    // always write a valid color; default to white if something odd
+    newFace[index] = allowedColors.has(currentColor) ? currentColor : "W";
     setFaces((prev) => ({ ...prev, [face]: newFace }));
   };
 
-  // ---------- Validation helpers ----------
-  const facesAreComplete = () =>
-    facesNames.every(
-      (f) =>
-        Array.isArray(faces[f]) &&
-        faces[f].length === 9 &&
-        faces[f].every((c) => allowedColors.has(c))
-    );
+  // ---------- Solve handler ----------
+  const handleSolve = async () => {
+    setResult(null);
 
-  const haveExactColorCounts = () => {
-    const counts = { W: 0, G: 0, R: 0, B: 0, O: 0, Y: 0 };
-    facesNames.forEach((f) => faces[f].forEach((c) => (counts[c] += 1)));
-    return Object.values(counts).every((n) => n === 9);
-  };
+    // 1) Basic validation
+    const faceOk = (arr) =>
+      Array.isArray(arr) && arr.length === 9 && arr.every((c) => allowedColors.has(c));
 
-  const buildCubeState = () =>
-    faces.U.join("") +
-    faces.R.join("") +
-    faces.F.join("") +
-    faces.D.join("") +
-    faces.L.join("") +
-    faces.B.join("");
+    const missing = facesNames.filter((f) => !faceOk(faces[f]));
+    if (missing.length) {
+      alert(
+        `Please fill all 9 stickers on these faces with W/G/R/B/O/Y: ${missing.join(
+          ", "
+        )}`
+      );
+      return;
+    }
 
-// ---------- Solve handler ----------
-const handleSolve = async () => {
-  setResult(null);
-
-  // 1) Basic validation: all 54 filled with allowed colors
-  const allowed = new Set(["W","G","R","B","O","Y"]);
-  const faceOk = (arr) =>
-    Array.isArray(arr) && arr.length === 9 && arr.every(c => allowed.has(c));
-
-  const missing = ["U","R","F","D","L","B"].filter(f => !faceOk(faces[f]));
-  if (missing.length) {
-    alert(`Please fill all 9 stickers on these faces with W/G/R/B/O/Y: ${missing.join(", ")}`);
-    return;
-  }
-
-  // 2) Strict counts: each color exactly 9 times
-  const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
-  ["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => counts[c]++));
-  const wrong = Object.entries(counts).filter(([,n]) => n !== 9);
-  if (wrong.length) {
-    alert("Each color must appear exactly 9 times across the cube.");
-    return;
-  }
-
-  // 3) Build color -> face-letter legend from centers
-  const centers = { U: faces.U[4], R: faces.R[4], F: faces.F[4], D: faces.D[4], L: faces.L[4], B: faces.B[4] };
-  if (Object.values(centers).some(c => !allowed.has(c))) {
-    alert("Please set the center (middle) on every face.");
-    return;
-  }
-  const colorToFace = {};
-  Object.entries(centers).forEach(([faceLetter, color]) => { colorToFace[color] = faceLetter; });
-
-  // 4) Convert every sticker color to face letters, in URFDLB order
-  const order = ["U","R","F","D","L","B"];
-  const faceToLetters = (faceArr) => faceArr.map(c => colorToFace[c]);
-  // ensure no color fell outside the 6 centers
-  if (!order.every(f => faceToLetters(faces[f]).every(ch => ch))) {
-    alert("Sticker colors must match one of the six center colors.");
-    return;
-  }
-  const cubeState = order.map(f => faceToLetters(faces[f]).join("")).join("");
-
-// 5) Debug & final validation before sending
-const dbgCounts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
-["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => dbgCounts[c]++));
-console.log("color counts:", dbgCounts);
-
-console.log("cubeState:", cubeState, "len:", cubeState.length);
-if (!/^[URFDLB]{54}$/.test(cubeState)) {
-  alert(`cubeState invalid → len=${cubeState.length}, value=${cubeState}`);
+    // 2) Strict counts inside handleSolve
+const dbgCounts = { W: 0, G: 0, R: 0, B: 0, O: 0, Y: 0 };
+facesNames.forEach((f) => faces[f].forEach((c) => (dbgCounts[c] += 1)));
+const wrong = Object.entries(dbgCounts).filter(([, n]) => n !== 9);
+if (wrong.length) {
+  alert(
+    `Each color must appear exactly 9 times. Current counts: ` +
+    `W:${dbgCounts.W} G:${dbgCounts.G} R:${dbgCounts.R} ` +
+    `B:${dbgCounts.B} O:${dbgCounts.O} Y:${dbgCounts.Y}`
+  );
   return;
 }
 
-  // 6) Send to backend
-  const payload = { cubeState, partitioned };
-  setLoading(true);
-  try {
-    const res = await fetch(`${API_URL}/solve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // 3) Build color -> face-letter legend from centers
+    const centers = {
+      U: faces.U[4],
+      R: faces.R[4],
+      F: faces.F[4],
+      D: faces.D[4],
+      L: faces.L[4],
+      B: faces.B[4],
+    };
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Backend error (${res.status}): ${text}`);
+    if (Object.values(centers).some((c) => !allowedColors.has(c))) {
+      alert("Please set the center (middle) on every face.");
+      return;
     }
 
-    const data = await res.json();
-    setResult(data);
-  } catch (err) {
-    alert("Error solving cube: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+    const colorToFace = {};
+    Object.entries(centers).forEach(([faceLetter, color]) => {
+      colorToFace[color] = faceLetter; // e.g. 'W' -> 'U'
+    });
 
+    // 4) Convert each sticker color to its face letter, in URFDLB order
+    const order = ["U", "R", "F", "D", "L", "B"];
+    const faceToLetters = (arr) => arr.map((c) => colorToFace[c]);
+
+    // ensure all stickers map to a known center color
+    if (!order.every((f) => faceToLetters(faces[f]).every((ch) => ch))) {
+      alert("Sticker colors must match one of the six center colors.");
+      return;
+    }
+
+    const cubeState = order
+      .map((f) => faceToLetters(faces[f]).join(""))
+      .join("");
+
+    // 5) Final validation & debug
+    console.log("color counts:", dbgCounts);
+    console.log("cubeState:", cubeState, "len:", cubeState.length);
+
+    if (!/^[URFDLB]{54}$/.test(cubeState)) {
+      alert(`cubeState invalid → len=${cubeState.length}, value=${cubeState}`);
+      return;
+    }
+
+    // 6) Send to backend
+    const payload = { cubeState, partitioned };
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/solve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Backend error (${res.status}): ${text}`);
+      }
+
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      alert("Error solving cube: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Live UI counts (for user feedback)
+  const uiCounts = { W: 0, G: 0, R: 0, B: 0, O: 0, Y: 0 };
+  facesNames.forEach((f) => faces[f].forEach((c) => (uiCounts[c] += 1)));
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -145,7 +148,11 @@ if (!/^[URFDLB]{54}$/.test(cubeState)) {
 
       <ColorPicker current={currentColor} onSelect={handleColorChange} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-2 text-sm text-gray-600">
+        Counts → W:{uiCounts.W} G:{uiCounts.G} R:{uiCounts.R} B:{uiCounts.B} O:{uiCounts.O} Y:{uiCounts.Y}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
         {facesNames.map((f) => (
           <CubeFace
             key={f}
