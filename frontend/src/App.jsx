@@ -114,28 +114,37 @@ if (wrong.length) {
       return;
     }
 
-    // 6) Send to backend
-    const payload = { cubeState, partitioned };
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/solve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+// 6) Send faces (not cubeState) to backend
+const facesPayload = {
+  U: faces.U.join(""),
+  R: faces.R.join(""),
+  F: faces.F.join(""),
+  D: faces.D.join(""),
+  L: faces.L.join(""),
+  B: faces.B.join(""),
+};
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Backend error (${res.status}): ${text}`);
-      }
+const payload = { faces: facesPayload, partitioned };
+setLoading(true);
+try {
+  const res = await fetch(`${API_URL}/solve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 
-      const data = await res.json();
-      setResult(data);
-    } catch (err) {
-      alert("Error solving cube: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Backend error (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  setResult(data);
+} catch (err) {
+  alert("Error solving cube: " + err.message);
+} finally {
+  setLoading(false);
+}
   };
   function fillSolved() {
   const centers = { U: "W", R: "R", F: "G", D: "Y", L: "O", B: "B" };
@@ -157,7 +166,7 @@ if (wrong.length) {
     >
       Fill Solved
     </button>
-    
+
       <ColorPicker current={currentColor} onSelect={handleColorChange} />
 
       <div className="mt-2 text-sm text-gray-600">
