@@ -137,7 +137,12 @@ if (wrong.length) {
       setLoading(false);
     }
   };
-
+  function fillSolved() {
+  const centers = { U: "W", R: "R", F: "G", D: "Y", L: "O", B: "B" };
+  const solved = {};
+  Object.entries(centers).forEach(([f, c]) => (solved[f] = Array(9).fill(c)));
+  setFaces(solved);
+  }
   // Live UI counts (for user feedback)
   const uiCounts = { W: 0, G: 0, R: 0, B: 0, O: 0, Y: 0 };
   facesNames.forEach((f) => faces[f].forEach((c) => (uiCounts[c] += 1)));
@@ -145,7 +150,14 @@ if (wrong.length) {
   return (
     <div className="max-w-4xl mx-auto p-4">
       <h1 className="text-3xl font-bold mb-4">Rubik&apos;s Cube Visual Solver</h1>
-
+       {/* New Button */}
+    <button
+      onClick={fillSolved}
+      className="mt-2 px-3 py-1 bg-green-600 text-white rounded"
+    >
+      Fill Solved
+    </button>
+    
       <ColorPicker current={currentColor} onSelect={handleColorChange} />
 
       <div className="mt-2 text-sm text-gray-600">
