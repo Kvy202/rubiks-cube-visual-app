@@ -104,9 +104,9 @@ const handleSolve = async () => {
   const cubeState = order.map(f => faceToLetters(faces[f]).join("")).join("");
 
 // 5) Debug & final validation before sending
-const counts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
-["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => counts[c]++));
-console.log("color counts:", counts);
+const dbgCounts = { W:0,G:0,R:0,B:0,O:0,Y:0 };
+["U","R","F","D","L","B"].forEach(f => faces[f].forEach(c => dbgCounts[c]++));
+console.log("color counts:", dbgCounts);
 
 console.log("cubeState:", cubeState, "len:", cubeState.length);
 if (!/^[URFDLB]{54}$/.test(cubeState)) {
